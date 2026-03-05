@@ -33,7 +33,7 @@ The application is structured as a four-panel IDE, inspired by PyCharm's layout.
 
 | Panel | Position | Default State |
 |-------|----------|---------------|
-| Schema Browser | Left | Visible, collapsible |
+| Schema Browser | Left | Hidden, toggleable |
 | Query Console | Center | Always visible |
 | AI Chat | Right | Collapsed, toggleable |
 | Bottom Drawer | Bottom | Collapsed, toggleable |
@@ -113,8 +113,8 @@ This is a visual warning only. The underlying parse data (positions, node SQL, d
 - Tree view: connection → schema → table → columns with data types
 - Search/filter box at top for large schemas
 - Blocked tables shown grayed out (from connection ACL)
-- **Click a table** → inserts `SELECT * FROM <table> LIMIT 100` into the console
-- **Click a column** → inserts the column name at the current cursor position in the console
+- **Click a table** → no action in MVP (future: insert into console)
+- **Click a column** → no action in MVP
 - No drag-and-drop in MVP
 
 ---
@@ -166,7 +166,7 @@ If the user edits and clicks a node within the 300ms debounce window (before re-
 
 When running a node, the backend:
 1. Walks the dependency graph upward from the target node to collect all ancestor CTEs
-2. Applies each node's injections (wraps the node's SQL in a subquery and appends WHERE/ORDER BY)
+2. Applies each node's injections via sqlglot AST manipulation (WHERE appended with AND, ORDER BY appended)
 3. Builds the full reconstructed query
 4. Executes and returns results (capped)
 
@@ -177,8 +177,8 @@ orders AS (SELECT * FROM raw_orders WHERE status = 'complete')
 
 -- After injecting WHERE order_id = 123:
 orders AS (
-  SELECT * FROM (SELECT * FROM raw_orders WHERE status = 'complete') AS _node
-  WHERE order_id = 123
+  SELECT * FROM raw_orders
+  WHERE status = 'complete' AND order_id = 123
 )
 ```
 
@@ -191,13 +191,13 @@ orders AS (
 | `POST /query/parse` | Parse SQL → lineage graph (nodes, edges, source positions, node SQL). Called by [Visualize] and background re-parse. | No |
 | `POST /connections/{id}/execute` | Execute full query with all active injections. | Yes |
 | `POST /connections/{id}/execute-node` | Execute a specific node's subtree with dependency + per-node injections. | Yes |
-| `POST /query/preview` | Return effective query string (original + injections applied). No execution. | No |
+| `POST /query/effective-sql` | Return effective query string (original + injections applied). No execution. | No |
 
 ### Parse response structure (per node)
 
 ```json
 {
-  "id": "cte_orders",
+  "id": "orders",
   "type": "cte",
   "name": "orders",
   "sql": "SELECT * FROM raw_orders WHERE status = 'complete'",
@@ -217,11 +217,9 @@ orders AS (
 
 | Topic | Deferred to |
 |-------|-------------|
-| Detailed frontend component spec (props, state, UI tests) | `05-query-console-frontend.md` |
-| Detailed backend spec (classes, models, full endpoint contracts, test plan) | `06-query-console-backend.md` |
-| Schema Browser full spec | Separate design doc |
-| AI Chat panel spec | Separate design doc |
-| Results Viewer spec | Separate design doc |
+| Detailed query console, lineage, and results spec | `05-query-console-lineage-detailed.md` |
+| AI Chat and agentic debugging spec | `06-ai-chat-and-debugging.md` |
+| Schema Browser full spec | `03-schema-browser-frontend.md` |
 
 ---
 

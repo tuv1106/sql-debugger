@@ -61,7 +61,7 @@ Nobody offers visual lineage + click-to-execute + AI-driven debugging in one too
 | Postgres | ✅ |
 | MySQL | ✅ |
 | BigQuery | ✅ |
-| Snowflake | ✅ |
+| Snowflake | ❌ (post-MVP) |
 
 ---
 
@@ -97,14 +97,14 @@ Allow users to securely connect their database to the tool.
 
 ### In MVP
 
-- Support Postgres, MySQL, BigQuery, Snowflake
+- Support Postgres, MySQL, BigQuery
 - Multiple saved connections
 - One active connection at a time
 - Connection naming (user-defined)
 - Basic auth:
   - Postgres/MySQL: host, port, database, username, password
-  - BigQuery: project ID, dataset, service account JSON
-  - Snowflake: account, warehouse, database, schema, username, password
+  - BigQuery: project ID, service account JSON
+  - Snowflake: account, warehouse, username, password
 - Hierarchical entity exclusion (schema/dataset/database/table level)
 - Allow All / Exclude All buttons
 - Connection test with latency display
@@ -161,6 +161,7 @@ Allow users to securely connect their database to the tool.
 - **Query results never touch cloud** — go directly from local backend to browser
 - **Cloud only sees:** query text (for agent reasoning), schema metadata (if user allows)
 - **No auth needed between local backend and cloud** — they don't communicate directly
+- **CORS middleware** on local backend allows only the cloud frontend origin
 
 ### Terminology
 
@@ -186,7 +187,7 @@ Allow users to securely connect their database to the tool.
 | Postgres | schema, table | database |
 | MySQL | database, table | — |
 | BigQuery | dataset, table | project |
-| Snowflake | database, schema, table | — |
+| Snowflake (post-MVP) | database, schema, table | — |
 
 ### Storage (Denormalized)
 
@@ -368,8 +369,8 @@ Opened by: `[+ New]` or `[Edit]`
 |---------|--------|
 | Postgres | Host, Port, Database, Username, Password |
 | MySQL | Host, Port, Database, Username, Password |
-| BigQuery | Project ID, Dataset, Service Account JSON (file upload or paste) |
-| Snowflake | Account, Warehouse, Database, Schema, Username, Password |
+| BigQuery | Project ID, Service Account JSON (file upload or paste) |
+| Snowflake (post-MVP) | Account, Warehouse, Username, Password |
 
 **Debug Access Tree UX:**
 
@@ -391,6 +392,8 @@ Opened by: `[+ New]` or `[Edit]`
 - Form fields are read-only by default when editing
 - User clicks `[Edit]` to enable editing
 - Once editing, `[Cancel]` reverts changes, `[Save]` saves
+- Entity tree is pre-loaded from saved exclusion config (no re-test required)
+- Subtle hint: "Schema may be outdated — click Refresh to see latest tables" if entity tree is loaded from saved config
 
 **States:**
 - **Form empty:** Test and Save disabled
@@ -635,12 +638,7 @@ Delete connection.
 }
 ```
 
-**Error (400):**
-```json
-{
-  "error": "Cannot delete active connection. Activate another connection first."
-}
-```
+**Note:** If the deleted connection is active, it is deactivated first. Deleting the last remaining connection is allowed.
 
 ---
 

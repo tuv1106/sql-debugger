@@ -146,7 +146,7 @@ Location: Left side of main toolbar / header area.
 | Postgres | schema | table | column | — |
 | MySQL | database | table | column | — |
 | BigQuery | dataset | table | column | — |
-| Snowflake | database | schema | table | column |
+| Snowflake (post-MVP) | database | schema | table | column |
 
 **Visual indicators:**
 - `▶` collapsed node (has children)
@@ -156,12 +156,20 @@ Location: Left side of main toolbar / header area.
 - Inherited exclusion (parent excluded): same grey style, tooltip "Excluded — inherited from [parent name]"
 - Column type shown right-aligned in monospace, muted color
 
+**Column type display:**
+- Right-aligned, muted monospace
+- Default width fits ~15–16 characters (e.g., `VARCHAR(255)` fits comfortably)
+- Longer types truncated with ellipsis (e.g., `VARCHAR(167…`)
+- Full type shown in hover tooltip
+- Column width resizable by dragging the border (like Excel cells)
+
 **Interactions:**
 - Click `▶`/`▼` to expand/collapse
 - Click table name → no action in MVP (future: select for query console)
 - `[↻]` refresh button — fetches fresh schema
 - `[X]` close button — hides panel
-- Search filters at all levels (schema names, table names)
+- Search filters by schema and table names only (not column names)
+- Search includes excluded entities (shown grey in results) — exclusion only affects AI agent, not browsing
 
 ---
 
@@ -294,16 +302,17 @@ This is free because sqlglot already parses the query for lineage visualization.
 | Session start (page load with active connection) | Background refresh, show cache if available |
 | DDL detected after query execution | Background refresh |
 | Manual refresh button [↻] | Foreground refresh with "Refreshing..." indicator |
+| Exclusion change (via Connection Management UI) | Background refresh to pick up new exclusion status |
 
 ---
 
 ## Endpoints
 
-### New Endpoint (Local Backend)
+### Endpoint (Local Backend)
 
-#### `GET /connections/{id}/schema`
+#### `GET /connections/{id}/entities?include_columns=true`
 
-Returns full schema tree with column info and exclusion status.
+Returns full schema tree with column info and exclusion status. This is the same `/entities` endpoint from the Connection Management spec, with `include_columns=true` to include column details for the Schema Browser.
 
 **Response (200) — Postgres example:**
 ```json
@@ -414,16 +423,16 @@ Returns full schema tree with column info and exclusion status.
 
 ---
 
-### Existing Endpoint Changes
+### Endpoint Usage
 
-The `GET /connections/{id}/entities` endpoint from the Connection Management spec returns the entity tree **without columns** (for the exclusion config UI). The new `GET /connections/{id}/schema` endpoint returns the full tree **with columns** (for the Schema Browser).
+The `GET /connections/{id}/entities` endpoint serves both the Connection Management UI and the Schema Browser:
 
-| Endpoint | Columns? | Purpose |
-|----------|----------|---------|
-| `GET /connections/{id}/entities` | No | Connection form — entity exclusion config |
-| `GET /connections/{id}/schema` | Yes | Schema Browser — full browsing |
+| Usage | Query Param | Columns? | Purpose |
+|-------|------------|----------|---------|
+| Connection form | (none) | No | Entity exclusion config |
+| Schema Browser | `?include_columns=true` | Yes | Full browsing with column types |
 
-Both endpoints include `excluded` and `exclusion_source` fields.
+Both usages include `excluded` and `exclusion_source` fields.
 
 ---
 
@@ -435,8 +444,8 @@ Both endpoints include `excluded` and `exclusion_source` fields.
 |----|-------------|-------|
 | Postgres | `information_schema.columns` | Filter by schema, exclude `pg_catalog`, `information_schema` |
 | MySQL | `information_schema.columns` | Filter by database |
-| BigQuery | `INFORMATION_SCHEMA.COLUMNS` per dataset | May need one query per dataset |
-| Snowflake | `information_schema.columns` | Filter by database, schema |
+| BigQuery | `region.INFORMATION_SCHEMA.COLUMNS` | Single region-level query returns all datasets |
+| Snowflake (post-MVP) | `information_schema.columns` | Filter by database, schema |
 
 ### Column Type Representation
 
@@ -447,11 +456,11 @@ Types are returned as-is from the database. No normalization.
 | Postgres | `integer`, `character varying(255)`, `timestamp with time zone`, `boolean` |
 | MySQL | `int`, `varchar(255)`, `datetime`, `tinyint(1)` |
 | BigQuery | `STRING`, `INT64`, `TIMESTAMP`, `FLOAT64`, `BOOL` |
-| Snowflake | `NUMBER(38,0)`, `VARCHAR(16777216)`, `TIMESTAMP_NTZ(9)` |
+| Snowflake (post-MVP) | `NUMBER(38,0)`, `VARCHAR(16777216)`, `TIMESTAMP_NTZ(9)` |
 
 ### Performance
 
-Schema fetch involves 1 query per DB type (BigQuery may need 1 per dataset). Expected latency:
+Schema fetch involves 1 query per DB type (all DBs including BigQuery use a single query). Expected latency:
 
 | Scenario | Expected Latency |
 |----------|-----------------|
@@ -460,6 +469,14 @@ Schema fetch involves 1 query per DB type (BigQuery may need 1 per dataset). Exp
 | Large DB (500+ tables) | 3-10s |
 
 This is why the stale-while-revalidate cache matters — users see cached data instantly while fresh data loads.
+
+---
+
+### Connection Switch — Request Cancellation
+
+**Project-wide rule:** Switching active connection cancels all in-flight requests for the previous connection (using `AbortController`). This applies to schema fetch, query execution, parse requests, and chat — not just the schema browser.
+
+For the schema browser specifically: if a schema fetch is in-flight and the user switches connections, the old fetch is cancelled, and a new fetch starts for the new connection.
 
 ---
 
@@ -496,7 +513,7 @@ This is why the stale-while-revalidate cache matters — users see cached data i
 | 13 | Excluded entity shows grey text + ⊘ icon | Unit |
 | 14 | Directly excluded entity tooltip shows "Excluded from AI debugging" | Unit |
 | 15 | Inherited excluded entity tooltip shows "Excluded — inherited from [parent]" | Unit |
-| 16 | Search filters tree by name at all levels | Unit |
+| 16 | Search filters tree by schema and table names (not columns) | Unit |
 | 17 | Search with no results shows "No matching entities" | Unit |
 | 18 | Search is case-insensitive | Unit |
 | 19 | Clear search restores full tree | Unit |
@@ -522,7 +539,20 @@ This is why the stale-while-revalidate cache matters — users see cached data i
 | 34 | Schema endpoint returns correct structure per DB type | Integration |
 | 35 | Excluded entities from connection config reflected in schema tree | Integration |
 
-### Summary: 35 tests
+| 36 | Connection switch cancels in-flight schema fetch, loads new connection | Integration |
+| 37 | Exclusion change triggers schema browser refresh | Integration |
+| 38 | Search matches table inside excluded parent — parent expands, shown grey | Unit |
+| 39 | Long column type truncated with ellipsis, full type in hover tooltip | Unit |
+| 40 | Column type width resizable by dragging | Unit |
+| 41 | Multiple rapid refresh clicks don't fire duplicate requests | Unit |
+| 42 | Postgres adapter fetches full schema via `information_schema.columns` | Integration |
+| 43 | MySQL adapter fetches full schema via `information_schema.columns` | Integration |
+| 44 | BigQuery adapter fetches full schema via region-level `INFORMATION_SCHEMA` | Integration |
+| 45 | Snowflake adapter fetches full schema via `information_schema.columns` | Integration |
+
+Note: Tests 42–45 overlap with DB Adapter tests in `02-connection-management-backend-v2.md` Section 6. Ensure those tests also cover the `include_columns=true` path.
+
+### Summary: 45 tests
 
 ---
 
@@ -538,9 +568,14 @@ This is why the stale-while-revalidate cache matters — users see cached data i
 | DDL detection | sqlglot classifies statement type | Free — sqlglot already parses for lineage |
 | Default visibility | Hidden, toggle button to show | Screen real estate. Not all users need it visible |
 | Excluded entity display | Grey text + ⊘ icon, still browsable | "Excluded from debugging" not "hidden". Users can still see and query |
-| Separate schema endpoint | `/schema` (with columns) vs `/entities` (without) | Different consumers need different detail levels |
+| Single endpoint with param | `/entities?include_columns=true` for Schema Browser, `/entities` for exclusion config | Avoids duplicate endpoint logic |
 | System schemas | Exclude pg_catalog, information_schema, etc. from tree | Noise for users. Can revisit if requested |
 | No click-to-query | Click on table does nothing in MVP | Future feature — select for Query Console |
+| BigQuery single query | Region-level `INFORMATION_SCHEMA` instead of per-dataset queries | One query returns all datasets, same as other DBs |
+| Connection switch cancellation | `AbortController` cancels all in-flight requests for previous connection | Project-wide rule — prevents stale responses from overwriting new data |
+| Type column truncation | Truncate with ellipsis, full type in tooltip, column resizable by dragging | Reasonable default width (~15 chars), handles long types like Snowflake's `VARCHAR(16777216)` |
+| Search includes excluded | Excluded entities appear in search results (grey + ⊘) | Exclusion only affects AI agent context, not user browsing |
+| Exclusion change refresh | Changing exclusions in Connection Management triggers schema browser refresh | Keeps exclusion status in sync without manual refresh |
 
 ---
 
@@ -561,7 +596,7 @@ This is why the stale-while-revalidate cache matters — users see cached data i
 
 - `01-connection-management-frontend.md` (v2) — Entity exclusion model
 - `02-connection-management-backend.md` (v2) — Storage format, exclusion logic
-- `00-project-overview.md` — MVP scope
+- `project-overview.md` — MVP scope
 
 ---
 

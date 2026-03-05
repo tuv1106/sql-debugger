@@ -63,6 +63,7 @@ Nobody offers visual lineage + click-to-execute + AI-driven debugging in one too
 - Query results never touch cloud
 - Cloud only sees query text for agent reasoning
 - No auth needed between local and cloud (they don't communicate directly)
+- CORS middleware on local backend allows only the cloud frontend origin — prevents other websites from accessing localhost
 
 ### Terminology
 
@@ -81,7 +82,7 @@ Nobody offers visual lineage + click-to-execute + AI-driven debugging in one too
 | Postgres | ✅ | Primary for testing |
 | MySQL | ✅ | |
 | BigQuery | ✅ | Key for analytics users |
-| Snowflake | ✅ | Key for analytics users |
+| Snowflake | ❌ | Deferred to post-MVP |
 
 **Parser:** sqlglot (dialect-agnostic)
 
@@ -184,10 +185,15 @@ Chat always has access to:
 |-------|--------|
 | Local Backend | Python, FastAPI |
 | Cloud Backend | Python, FastAPI |
-| Agent Framework | LangChain (or similar) |
+| Agent Framework | LangGraph (LangChain ecosystem) |
 | SQL Parsing | sqlglot |
-| LLM | Claude/GPT-4 (controlled by us) |
-| Frontend | TBD (likely React) |
+| LLM | Claude (via Anthropic API, controlled by us) |
+| Frontend | React 19 + TypeScript, Vite |
+| Styling | Tailwind CSS |
+| State Management | Zustand |
+| SQL Editor | CodeMirror 6 |
+| Graph Visualization | React Flow + ELK (layout) |
+| Results Table | TanStack Table |
 | Deployment | Railway or Render |
 | Credential Storage | OS keyring with encrypted file fallback |
 
@@ -207,6 +213,23 @@ sql-debugger start --port 8765
 - Enforce table allowlist/blocklist
 - Cap result size before sending to browser
 - Never send credentials or data to cloud
+
+---
+
+## Project-wide Rules
+
+### Connection Switch = Full Reset
+
+Switching the active connection cancels all in-flight operations and resets the UI to a fresh state:
+- Cancel all running queries (schema fetch, execute, execute-node)
+- Clear lineage graph and parse cache
+- Clear results tabs
+- Clear all injections (sessionStorage)
+- Cancel active debug session
+- Clear chat sessions
+- Schema browser loads fresh for the new connection
+
+This is enforced via `AbortController` — all in-flight requests for the previous connection are cancelled.
 
 ---
 
@@ -243,16 +266,13 @@ sql-debugger start --port 8765
 
 | Feature | Document | Status |
 |---------|----------|--------|
-| Connection Management | `01-connection-management-frontend.md` | ✅ Complete |
-| Connection Management Backend | TBD | Pending |
-| Schema Browser | TBD | Pending |
-| Query Console | TBD | Pending |
-| Query Lineage Visualization | TBD | Pending |
-| Click Node → Execute | TBD | Pending |
-| Filter & Order Injection | TBD | Pending |
-| Results Viewer | TBD | Pending |
-| Agentic Debugging | TBD | Pending |
-| Free Chat | TBD | Pending |
+| Connection Management Frontend | `01-connection-management-frontend-v2.md` | ✅ Complete |
+| Connection Management Backend | `02-connection-management-backend-v2.md` | ✅ Complete |
+| Schema Browser | `03-schema-browser-frontend.md` | ✅ Complete |
+| Query Console & Lineage (high-level) | `04-query-console-design.md` | ✅ Complete |
+| Query Console, Lineage & Results (detailed) | `05-query-console-lineage-detailed.md` | ✅ Complete |
+| AI Chat & Agentic Debugging | `06-ai-chat-and-debugging.md` | ✅ Complete |
+| Cloud Backend | `07-cloud-backend.md` | ✅ Complete |
 
 ---
 

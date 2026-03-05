@@ -18,7 +18,7 @@ Local backend handles all database operations. Runs on user's machine, stores cr
 
 **Key principles:**
 - Stateless requests — each request includes `connection_id`
-- Active connection managed by UI (localStorage), not backend
+- Active connection managed by backend (persisted in config.json)
 - Passwords in keyring, metadata in config.json
 - Entity exclusions denormalized for O(1) reads
 
@@ -59,8 +59,8 @@ local_backend/
 |----------|--------|
 | PostgresConnectionParams | host, port, database, username, password |
 | MySQLConnectionParams | host, port, database, username, password |
-| BigQueryConnectionParams | project_id, dataset, service_account_json |
-| SnowflakeConnectionParams | account, warehouse, database, schema, username, password |
+| BigQueryConnectionParams | project_id, service_account_json |
+| SnowflakeConnectionParams (post-MVP) | account, warehouse, username, password |
 
 **Validation:** On create/update/test only, NOT when loading from config.
 
@@ -75,7 +75,7 @@ local_backend/
 | PostgresTable | "schema.table" |
 | MySQLTable | "database.table" |
 | BigQueryTable | "project.dataset.table" |
-| SnowflakeTable | "database.schema.table" |
+| SnowflakeTable (post-MVP) | "database.schema.table" |
 
 ---
 
@@ -88,7 +88,7 @@ local_backend/
 | Postgres | schema, table | `blocked_schemas`, `blocked_tables` |
 | MySQL | database, table | `blocked_databases`, `blocked_tables` |
 | BigQuery | dataset, table | `blocked_datasets`, `blocked_tables` |
-| Snowflake | database, schema, table | `blocked_databases`, `blocked_schemas`, `blocked_tables` |
+| Snowflake (post-MVP) | database, schema, table | `blocked_databases`, `blocked_schemas`, `blocked_tables` |
 
 **Not excludable (= the connection itself):** Postgres database, BigQuery project.
 
@@ -100,7 +100,7 @@ local_backend/
 - `include_all()` — clear all
 - `sync_new_tables(schema_tree)` — add new tables under excluded parents
 
-**Subclasses:** `PostgresExclusionConfig`, `MySQLExclusionConfig`, `BigQueryExclusionConfig`, `SnowflakeExclusionConfig`
+**Subclasses:** `PostgresExclusionConfig`, `MySQLExclusionConfig`, `BigQueryExclusionConfig`, `SnowflakeExclusionConfig` (post-MVP)
 
 **Resolution logic for `is_excluded(table)`:**
 
@@ -191,7 +191,7 @@ Business logic layer. Key methods:
 - `update_connection` — checks duplicate if name changed
 - `delete_connection`
 - `test_connection` — accepts params or connection_id
-- `list_entities` — returns entity tree with exclusion status merged
+- `list_entities(include_columns)` — returns entity tree with exclusion status merged. When `include_columns=true`, includes column names and types (for Schema Browser)
 - `exclude_entities(connection_id, entities)` — validates entity types, delegates to ExclusionConfig
 - `include_entities(connection_id, entities)` — validates entity types, delegates to ExclusionConfig
 - `exclude_all(connection_id)` — fetches entity tree, excludes all
@@ -274,7 +274,6 @@ Business logic layer. Key methods:
       "name": "BigQuery Analytics",
       "db_type": "bigquery",
       "project_id": "project-123",
-      "dataset": "analytics",
       "needs_reauth": false,
       "blocked_datasets": ["raw_pii"],
       "blocked_tables": {
@@ -286,7 +285,7 @@ Business logic layer. Key methods:
 }
 ```
 
-**config.json — Snowflake connection example:**
+**config.json — Snowflake connection example (post-MVP):**
 ```json
 {
   "version": "2.0",
@@ -296,8 +295,6 @@ Business logic layer. Key methods:
       "db_type": "snowflake",
       "account": "xy12345.us-east-1",
       "warehouse": "COMPUTE_WH",
-      "database": "PROD",
-      "schema": "PUBLIC",
       "username": "admin",
       "needs_reauth": false,
       "blocked_databases": ["SECRETS_DB"],
@@ -328,11 +325,124 @@ Business logic layer. Key methods:
 | PUT | /connections/{id} | Update |
 | DELETE | /connections/{id} | Delete |
 | POST | /connections/test | Test connection |
-| GET | /connections/{id}/entities | List entity tree with exclusion status |
+| GET | /connections/{id}/entities | List entity tree with exclusion status. `?include_columns=true` adds column info for Schema Browser |
 | POST | /connections/{id}/entities/exclude | Exclude entities |
 | POST | /connections/{id}/entities/include | Include entities |
 | POST | /connections/{id}/entities/exclude-all | Exclude all |
 | POST | /connections/{id}/entities/include-all | Include all |
+| GET | /connections/{id}/tables/{table}/profile | Profile a table (row count, column stats) |
+| GET | /connections/{id}/tables/{table}/indexes | Get indexes and constraints for a table |
+| POST | /connections/{id}/sample | Sample rows from a table or node subtree |
+
+---
+
+### AI Agent Support Endpoints
+
+These endpoints support the AI chat and debug agents. They are called by the frontend (acting as proxy for the cloud backend agent).
+
+#### `GET /connections/{id}/tables/{table}/profile`
+
+Profile a table's shape and column statistics.
+
+**Response (200):**
+```json
+{
+  "table": "public.orders",
+  "row_count": 5230,
+  "column_count": 8,
+  "columns": [
+    {
+      "name": "id",
+      "type": "integer",
+      "null_count": 0,
+      "distinct_count": 5230,
+      "min": 1,
+      "max": 5230
+    },
+    {
+      "name": "price",
+      "type": "numeric",
+      "null_count": 339,
+      "distinct_count": 156,
+      "min": 0.99,
+      "max": 999.00
+    },
+    {
+      "name": "status",
+      "type": "character varying(50)",
+      "null_count": 0,
+      "distinct_count": 4,
+      "min": null,
+      "max": null
+    }
+  ]
+}
+```
+
+Min/max only populated for numeric and date/timestamp types. Null for text/boolean.
+
+**Error (403):** Table is excluded from debugging context.
+**Error (404):** Connection or table not found.
+
+---
+
+#### `GET /connections/{id}/tables/{table}/indexes`
+
+Get indexes, primary keys, and partitioning info for a table.
+
+**Response (200):**
+```json
+{
+  "table": "public.orders",
+  "primary_key": ["id"],
+  "indexes": [
+    {
+      "name": "idx_status",
+      "columns": ["status"],
+      "unique": false
+    }
+  ],
+  "partitioning": null
+}
+```
+
+Note: BigQuery has no traditional indexes. Returns partitioning and clustering info instead.
+
+**Error (403):** Table is excluded from debugging context.
+**Error (404):** Connection or table not found.
+
+---
+
+#### `POST /connections/{id}/sample`
+
+Get sample rows from a table.
+
+**Request:**
+```json
+{
+  "table": "public.orders",
+  "limit": 10
+}
+```
+
+**Response (200):**
+```json
+{
+  "columns": [
+    { "name": "id", "type": "integer" },
+    { "name": "status", "type": "character varying(50)" }
+  ],
+  "rows": [
+    [1, "complete"],
+    [2, "pending"]
+  ],
+  "total_rows": 10,
+  "truncated": false
+}
+```
+
+**Error (403):** Table is excluded from debugging context.
+**Error (404):** Connection or table not found.
 
 ---
 
@@ -394,7 +504,7 @@ Business logic layer. Key methods:
 
 ### Integration Tests
 
-**API (24 tests):**
+**API (30 tests):**
 - Health check returns 200
 - Full CRUD flow works
 - Duplicate returns 400
@@ -406,6 +516,12 @@ Business logic layer. Key methods:
 - POST /entities/exclude-all excludes everything
 - POST /entities/include-all clears everything
 - Invalid entity level returns 400
+- GET /tables/{table}/profile returns correct stats
+- GET /tables/{table}/profile on excluded table returns 403
+- GET /tables/{table}/indexes returns correct index info
+- GET /tables/{table}/indexes on excluded table returns 403
+- POST /sample returns sample rows
+- POST /sample on excluded table returns 403
 
 **Full Flows (5 tests):**
 - Create → test → save → list → delete
@@ -422,7 +538,7 @@ Business logic layer. Key methods:
 - list_entities returns correct hierarchy per DB type
 - List tables, execute queries
 
-### Summary: 126 tests total
+### Summary: 132 tests total
 
 ---
 
@@ -435,7 +551,7 @@ Business logic layer. Key methods:
 | Postgres | psycopg2-binary |
 | MySQL | mysql-connector-python |
 | BigQuery | google-cloud-bigquery |
-| Snowflake | snowflake-connector-python |
+| Snowflake (post-MVP) | snowflake-connector-python |
 | Secrets | keyring |
 | Testing | pytest |
 | Test DBs | Docker |
@@ -445,8 +561,9 @@ Business logic layer. Key methods:
 ## 8. Startup
 
 On startup, call `config_store.reconcile()`:
-1. Remove orphan keyring entries (no matching config)
-2. Mark connections with missing passwords as `needs_reauth: true`
+1. For each connection in config.json, check if keyring entry exists — if not, mark `needs_reauth: true`
+
+Note: Orphan keyring entries (password in keyring but no matching config) are not cleaned up. Most keyring APIs don't support listing all entries for a service. Orphans are harmless and rare (only from crashes). The `delete_connection` flow already removes keyring entries, preventing orphans during normal operation.
 
 ---
 
@@ -454,7 +571,7 @@ On startup, call `config_store.reconcile()`:
 
 - `01-connection-management-frontend.md` (v2)
 - `03-schema-browser-frontend.md`
-- `00-project-overview.md`
+- `project-overview.md`
 
 ---
 
