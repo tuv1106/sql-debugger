@@ -147,7 +147,11 @@ EOF
 )"
 ```
 
-## 5. Files That Must NEVER Be Committed
+## 5. NEVER Change the Git Remote URL
+
+The remote is configured as HTTPS (`https://github.com/...`). **Do NOT change it to SSH** (`git@github.com:...`). The developer's credentials are configured for HTTPS — switching to SSH will break push/pull.
+
+## 6. Files That Must NEVER Be Committed
 
 The following must never be committed:
 

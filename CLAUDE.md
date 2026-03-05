@@ -92,9 +92,12 @@ docker compose up                              # all 3 services + test DBs
 ## Git Workflow
 
 - Always check current branch with `git branch` before starting work
-- Always branch from `main` (or `develop` if it exists), never from another feature branch
+- Always branch from `main`, never from another feature branch
 - Create a feature branch before making any commits — never commit directly to main
+- Branch naming: `feat/<task_id>-<short-name>` (e.g., `feat/2.1-connection-models`)
 - Run full test suite before committing
+- **NEVER change the git remote URL** — it uses HTTPS and must stay that way
+- See `skills/git/SKILL.md` for full workflow
 
 ## Planning Before Implementation
 
