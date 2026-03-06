@@ -6,7 +6,7 @@
 
 ## Phase 1: Scaffolding
 
-- [ ] 1.1: Local Backend Project Setup | branch: | commit:
+- [x] 1.1: Local Backend Project Setup | branch: `feat/1.1-local-backend-setup` | commit:
 - [ ] 1.2: Frontend Project Setup | branch: | commit:
 - [ ] 1.3: Cloud Backend Project Setup | branch: | commit:
 - [ ] 1.4: Docker Compose for Development | branch: | commit:
