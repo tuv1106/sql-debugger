@@ -1,0 +1,9 @@
+[project]
+name = "sql-debugger-cloud"
+version = "0.1.0"
+description = "Cloud backend for SQL Debugger — handles AI reasoning via LangGraph"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/cloud_backend"]
+pythonpath = ["."]
