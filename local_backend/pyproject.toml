@@ -1,0 +1,9 @@
+[project]
+name = "sql-debugger-local"
+version = "0.1.0"
+description = "Local backend for SQL Debugger — handles DB credentials and query execution"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/local_backend"]
+pythonpath = ["."]
