@@ -1,0 +1,27 @@
+services:
+  local_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    volumes:
+      - ./local_backend:/app/local_backend
+    command: uvicorn local_backend.main:app --host 0.0.0.0 --port 8765 --reload
+
+  cloud_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+    volumes:
+      - ./cloud_backend:/app/cloud_backend
+    command: uvicorn cloud_backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
