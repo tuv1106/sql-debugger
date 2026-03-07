@@ -15,7 +15,7 @@
 
 > Depends on: Phase 1 complete
 
-- [ ] 2.1: Connection Models (Pydantic) | branch: | commit:
+- [ ] 2.1: Connection Models (Pydantic) | branch: `feat/2.1-connection-models` | commit:
 - [ ] 2.2: Table Identifiers | branch: | commit:
 - [ ] 2.3: Entity Exclusion Model | branch: | commit:
 - [ ] 2.4: Config Store | branch: | commit:

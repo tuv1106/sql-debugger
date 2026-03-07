@@ -142,10 +142,10 @@ Task <id>: <name> from implementation plan
 - [ ] All task tests pass
 - [ ] Sanity check: files exist, key symbols defined
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
+Note: DO NOT RIGTH THE Co-Authored-By: <> AT ALL IN THE COMMIT MESSAGE. 
 
 ## 5. NEVER Change the Git Remote URL
 
