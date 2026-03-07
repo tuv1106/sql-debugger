@@ -16,7 +16,7 @@
 > Depends on: Phase 1 complete
 
 - [x] 2.1: Connection Models (Pydantic) | branch: `feat/2.1-connection-models` | commit: `cb1ae82`
-- [ ] 2.2: Table Identifiers | branch: | commit:
+- [x] 2.2: Table Identifiers | branch: `feat/2.2-table-identifiers` | commit:
 - [ ] 2.3: Entity Exclusion Model | branch: | commit:
 - [ ] 2.4: Config Store | branch: | commit:
 - [ ] 2.5: Custom Exceptions | branch: | commit:
