@@ -53,6 +53,21 @@ Before planning, assess whether the task is well-defined and reasonably scoped.
 
 Do not proceed with open questions. Resolve them first.
 
+## 2.5. Write the Plan to Working Log
+
+After scope check passes and before implementation begins, write the plan to a file:
+
+1. Create a file under `docs/working_log/` named `<task_id>-<short-name>.md` (e.g., `1.1-local-backend-setup.md`, `2.3-entity-exclusion-model.md`)
+2. The file should contain:
+   - Task ID and name
+   - Goal summary
+   - Files to create/modify
+   - Models, functions, or endpoints to implement
+   - Tests to write (with count)
+   - Any design decisions
+3. Present the plan to the developer and **wait for approval** before implementing.
+4. If the developer requests changes to the plan, update the file before proceeding.
+
 ## 3. Implement
 
 Execute the task. Write code and tests as described in the implementation plan.
@@ -105,9 +120,13 @@ If the unexpected change is significant (new files, different approach, expanded
 
 After implementation is complete:
 
-1. Follow `skills/todo_workflow/SKILL.md` → Section 4 (After Task Completion) to mark checkboxes, commit, push, and update `todos.md`.
-2. Follow `skills/git/SKILL.md` → Sections 3 and 4 (Commit and Push/PR).
-3. Ask the developer for permission before starting the next task.
+1. **Write Retrospect:** Add a `## Retrospect` section to the task's working log file (`docs/working_log/<task_id>-<short-name>.md`). In this section:
+   - If the implementation followed the plan exactly, say so briefly.
+   - If it deviated, explain why: developer request, something not considered during planning, technical discovery, or any other reason.
+   - Note any lessons learned that might help future tasks.
+2. Follow `skills/todo_workflow/SKILL.md` → Section 4 (After Task Completion) to mark checkboxes, commit, push, and update `todos.md`.
+3. Follow `skills/git/SKILL.md` → Sections 3 and 4 (Commit and Push/PR).
+4. Ask the developer for permission before starting the next task.
 
 ## Workflow Summary
 
@@ -119,7 +138,9 @@ Read context (CLAUDE.md -> implementation plan -> spec docs -> existing code)
     |
 Scope check (flag issues -> wait if unclear)
     |
+Write plan to docs/working_log/ -> wait for developer approval
+    |
 Implement (TDD: test first -> implement -> verify)
     |
-Complete (update todos.md, commit, push, ask permission)
+Complete (write retrospect -> update todos.md -> commit -> push -> ask permission)
 ```
